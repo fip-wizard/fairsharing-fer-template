@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+{%- import "src/uuids.j2" as uuids with context -%}
+{%- macro validateOrcid(value) -%}
+  {%- if value|length == 19 -%}
+    {%- set parts = value.split('-') -%}
+    {%- if parts|length == 4 -%}
+      {%- for part in parts -%}
+        {%- if part|length != 4 -%}
+          {{- value|error('Invalid ORCID') -}}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- else -%}
+      {{- value|error('Invalid ORCID') -}}
+    {%- endif -%}
+  {%- else -%}
+    {{- value|error('Invalid ORCID') -}}
+  {%- endif -%}
+{%- endmacro -%}
+{%- set dc = ctx|to_context_obj -%}
+{%- set km = ctx.knowledgeModel -%}
+{%- set repliesMap = ctx.questionnaireReplies -%}
+{%- set fairsharingItem = {} -%}
+{%- set orcid = repliesMap[uuids.orcidPath]|reply_str_value -%}
+{%- if not orcid -%}
+    {{ ""|error("Author's ORCID is missing") }}
+{%- endif -%}
+{{- validateOrcid(orcid) -}}
+{%- set fairsharingReply = repliesMap[uuids.fairsharingPath] -%}
+{%- if not fairsharingReply -%}
+    {{ ""|error("FAIRsharing resource not selected") }}
+{%- elif fairsharingReply.value.value.type != "IntegrationType"  -%}
+    {{ ""|error("FAIRsharing resource not selected from integration") }}
+{%- else -%}
+    {%- set username = secrets["FAIRSHARING_USER"] -%}
+    {%- set password = secrets["FAIRSHARING_PASS"] -%}
+    {%- set headers = {"Accept": "application/json", "Content-Type": "application/json"} -%}
+    {%- set creds = {"user": {"login": username, "password": password}} -%}
+    {%- set r1 = requests.post("https://api.fairsharing.org/users/sign_in", headers=headers, json=creds) -%}
+    {%- set token = "" -%}
+    {%- if r1.ok -%}
+        {%- set token = r1.json()['jwt'] -%}
+    {%- else -%}
+        {{ ""|error("Failed to authenticate to FAIRsharing API") }}
+    {%- endif -%}
+    {%- set recordUrl = "https://api.fairsharing.org/fairsharing_records/" ~ fairsharingReply.value.value.id -%}
+    {%- set headers = {"Accept": "application/json", "Content-Type": "application/json", "Authorization": "Bearer " ~ token} -%}
+    {%- set r2 = requests.get(recordUrl, headers=headers) -%}
+    {%- if r2.ok -%}
+        {%- set fairsharingItem = r2.json()['data'] -%}
+    {%- else -%}
+        {{ ""|error("Failed process FAIRsharing API response") }}
+    {%- endif -%}
+{%- endif -%}
+
+{%- set types = [] -%}
+{%- set typeItems = repliesMap[uuids.typesPath]|reply_items -%}
+{%- for item in typeItems -%}
+    {%- set typeReply = repliesMap[[uuids.typesPath, item, uuids.typeQUuid]|reply_path] -%}
+    {%- if typeReply and typeReply.value.value.id -%}
+        {%- do types.append(typeReply.value.value.id) -%}
+    {%- elif typeReply -%}
+        {%- do types.append(typeReply.value.value.value) -%}
+    {%- endif -%}
+{%- endfor -%}
+{%- set resources = [] -%}
+{%- set resourceItems = repliesMap[uuids.resourcesPath]|reply_items -%}
+{%- for item in resourceItems -%}
+    {%- set resource = repliesMap[[uuids.resourcesPath, item, uuids.resourceQUuid]|reply_path]|reply_str_value -%}
+    {%- if resource -%}
+        {%- do resources.append(resource) -%}
+    {%- endif -%}
+{%- endfor -%}
+
+{%- if not fairsharingItem.get("attributes", None) -%}
+    {{ error("Failed process FAIRsharing API response") }}
+{%- endif -%}
+{%- set specificationUrl = repliesMap[uuids.specPath]|reply_str_value -%}
+{%- set fshUrl = fairsharingItem["attributes"]["url"] -%}
+{%- if fairsharingItem["attributes"]["doi"] %}
+  {%- set fshUrl = "https://doi.org/" ~ fairsharingItem["attributes"]["doi"] -%}
+{%- endif -%}
+{%- set fshName = fairsharingItem["attributes"]["metadata"]["name"] -%}
+{%- set fshDescription = fairsharingItem["attributes"]["metadata"]["description"] -%}
+{%- set fshHomepage = fairsharingItem["attributes"]["metadata"]["homepage"] -%}
+<html>
+    <head>
+      <style type="text/css">
+            body { margin: 20px; font-size: 11pt; color: #444; }
+            .notice {
+            color: black;
+            background: #cccccc; 
+            text-align: center;
+            padding: 0.5em;
+            border-radius: 6px;
+            border: 1px solid #fc0303;
+            margin-bottom: 2em;
+            font-size: 12pt;
+            font-family: sans-serif;
+            }
+            pre {
+            white-space: pre-wrap;
+            white-space: -moz-pre-wrap; 
+            white-space: -pre-wrap;
+            white-space: -o-pre-wrap;
+            word-wrap: break-word;
+            }
+            .nanopub-name {
+            padding: 0.5em;
+            text-align: center;
+            font-size: 12pt;
+            font-family: sans-serif;
+            }
+            .nanopub { margin: 0 0 30px 0; padding: 0px 10px 10px 10px; border-radius: 10px; border: solid; border-width: 1px; }
+            .nanopub-prefixes { margin-top: 10px; }
+            .nanopub-head { background: #e8e8e8; padding: 10px; margin-top: 10px; border-radius: 10px; }
+            .nanopub-assertion { background: #99ccff; padding: 10px; margin-top: 10px; border-radius: 10px; }
+            .nanopub-provenance { background: #f3a08c; padding: 10px; margin-top: 10px; border-radius: 10px; }
+            .nanopub-pubinfo { background: #ffff66; padding: 10px; margin-top: 10px; border-radius: 10px; }
+            .nanopub-index { background: #cad7e5; }
+        </style>
+    </head>
+    <body>
+        <div class="notice">
+        This is preview of nanopublication(s). If you want to submit nanopublication, go to <strong>Documents</strong> tab, generate <strong>RDF TriG</strong> and then use <strong>Submit</strong>.
+        </div>
+<div class="nanopub">
+<pre class="nanopub-prefixes">
+@prefix : &lt;http://purl.org/nanopub/temp/fair-resource/{{ dc.qtn.uuid }}/{{ dc.doc.uuid }}#&gt; .
+@prefix np: &lt;http://www.nanopub.org/nschema#&gt; .
+@prefix dct: &lt;http://purl.org/dc/terms/&gt; .
+@prefix fip: &lt;https://w3id.org/fair/fip/terms/&gt; .
+@prefix orcid: &lt;https://orcid.org/&gt; .
+@prefix prov: &lt;http://www.w3.org/ns/prov#&gt; .
+@prefix rdfs: &lt;http://www.w3.org/2000/01/rdf-schema#&gt; .
+@prefix skos: &lt;http://www.w3.org/2004/02/skos/core#&gt; .
+@prefix xsd: &lt;http://www.w3.org/2001/XMLSchema#&gt; .
+@prefix npx: &lt;http://purl.org/nanopub/x/&gt; .
+@prefix schema: &lt;http://schema.org/&gt; .
+@prefix doap: &lt;http://usefulinc.com/ns/doap#&gt; .
+
+</pre>
+<pre class="nanopub-head">:Head {
+  : a np:Nanopublication ;
+    np:hasAssertion :assertion ;
+    np:hasProvenance :provenance ;
+    np:hasPublicationInfo :pubinfo .
+}
+</pre>
+<pre class="nanopub-assertion">:assertion {
+  &lt;{{ fshUrl }}&gt; a fip:FAIR-Enabling-Resource .
+  &lt;{{ fshUrl }}&gt; a fip:Available-FAIR-Enabling-Resource .
+
+  # FAIRsharing information
+  &lt;{{ fshUrl }}&gt; rdfs:label "{{ fshName }}" .
+  &lt;{{ fshUrl }}&gt; rdfs:comment "{{ fshDescription }}" .
+  &lt;{{ fshUrl }}&gt; rdfs:seeAlso &lt;{{ fshUrl }}&gt; .
+  &lt;{{ fshUrl }}&gt; schema:url &lt;{{ fshHomepage }}&gt; .
+  
+  # FER types
+  {%- for type in types %}
+  &lt;{{ fshUrl }}&gt; a &lt;{{ type }}&gt; .
+  {%- else %}
+  # - no FER type specified
+  {%- endfor %}
+
+  # Further information (resource URLs)
+  {%- for resource in resources %}
+  &lt;{{ fshUrl }}&gt; rdfs:seeAlso &lt;{{ resource }}&gt; .
+  {%- else %}
+  # - no further resources specified
+  {%- endfor %}
+
+  # Specification URL
+  {%- if specificationUrl %}
+  &lt;{{ fshUrl }}&gt; doap:implements &lt;{{ specificationUrl }}&gt; .
+  {%- else %}
+  # - no specification URL specified
+  {%- endif %}
+}
+</pre>
+<pre class="nanopub-provenance">:provenance {
+  :assertion dct:creator orcid:{{ orcid }} .
+  :assertion prov:wasDerivedFrom &lt;{{ fshUrl }}&gt; .
+}
+</pre>
+<pre class="nanopub-pubinfo">:pubinfo {
+  : dct:created "{{ dc.doc.created_at|datetime_format("%Y-%m-%dT%H:%M:%SZ") }}"^^xsd:dateTime ;
+    dct:creator &lt;{{ dc.config.client_url }}&gt; ;
+    prov:wasDerivedFrom &lt;https://w3id.org/fip/wizard/{{ dc.qtn.uuid }}&gt; ;
+    dct:license &lt;https://creativecommons.org/publicdomain/zero/1.0/&gt; .
+}
+</pre>
+</div>
+
+{#
+<h2>Development: FAIRsharing detail</h2>
+<pre>
+{{fairsharingItem|tojson(2)}}
+</pre>
+#}
+    </body>
+</html>
