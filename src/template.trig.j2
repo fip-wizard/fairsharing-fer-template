@@ -1,4 +1,5 @@
 {%- import "src/uuids.j2" as uuids with context -%}
+{%- import "src/submissions.j2" as submissions with context -%}
 {%- macro validateOrcid(value) -%}
   {%- if value|length == 19 -%}
     {%- set parts = value.split('-') -%}
@@ -143,4 +144,9 @@
     dct:creator <{{ dc.config.client_url }}> ;
     prov:wasDerivedFrom <https://w3id.org/fip/wizard/{{ dc.qtn.uuid }}> ;
     dct:license <https://creativecommons.org/publicdomain/zero/1.0/> .
+  
+  : npx:describes <{{ fshUrl }}> .
+  {%- if submissions.nanopubs|length > 0 %}
+  : npx:supersedes <{{ submissions.nanopubs[0].uri }}> .
+  {%- endif %}
 }

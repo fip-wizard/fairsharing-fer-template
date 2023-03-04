@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 {%- import "src/uuids.j2" as uuids with context -%}
+{%- import "src/submissions.j2" as submissions with context -%}
 {%- macro validateOrcid(value) -%}
   {%- if value|length == 19 -%}
     {%- set parts = value.split('-') -%}
@@ -188,6 +189,11 @@
     dct:creator &lt;{{ dc.config.client_url }}&gt; ;
     prov:wasDerivedFrom &lt;https://w3id.org/fip/wizard/{{ dc.qtn.uuid }}&gt; ;
     dct:license &lt;https://creativecommons.org/publicdomain/zero/1.0/&gt; .
+
+  : npx:describes &lt;{{ fshUrl }}&gt; .
+  {%- if submissions.nanopubs|length > 0 %}
+  : npx:supersedes &lt;{{ submissions.nanopubs[0].uri }}&gt; .
+  {%- endif %}
 }
 </pre>
 </div>

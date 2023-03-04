@@ -1,7 +1,7 @@
 {
     "templateId": "fairsharing-fer-nanopublication",
     "organizationId": "gofair",
-    "version": "0.3.0",
+    "version": "1.0.0",
     "name": "FAIRsharing FER Nanopublication",
     "description": "Creating nanopublication from FAIRsharing",
     "license": "Apache-2.0",
@@ -25,7 +25,8 @@
                     "options": {
                         "template": "src/template.html.j2",
                         "content-type": "text/html",
-                        "extension": "html"
+                        "extension": "html",
+                        "extras": "submissions"
                     }
                 }
             ]
@@ -40,7 +41,8 @@
                     "options": {
                         "template": "src/template.trig.j2",
                         "content-type": "text/html",
-                        "extension": "trig"
+                        "extension": "trig",
+                        "extras": "submissions"
                     }
                 }
             ]

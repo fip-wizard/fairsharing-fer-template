@@ -4,6 +4,11 @@ Creating nanopublication from FAIRsharing
 
 ## Changelog
 
+### 1.0.0
+
+- Add support for `npx:supersedes`
+- Add support for `npx:describes`
+
 ### 0.2.0
 
 - Update to metamodel v11
