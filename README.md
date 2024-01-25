@@ -4,6 +4,10 @@ Creating nanopublication from FAIRsharing
 
 ## Changelog
 
+### 1.2.0
+
+- Include abbreviation in label if it exists
+
 ### 1.1.0
 
 - Update to metamodel v12
