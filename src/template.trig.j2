@@ -79,7 +79,13 @@
 {%- if fairsharingItem["attributes"]["doi"] %}
   {%- set fshUrl = "https://doi.org/" ~ fairsharingItem["attributes"]["doi"] -%}
 {%- endif -%}
-{%- set fshName = fairsharingItem["attributes"]["metadata"]["name"] -%}
+{%- if fairsharingItem["attributes"]["metadata"]["abbreviation"] and 
+       fairsharingItem["attributes"]["metadata"]["abbreviation"] != fairsharingItem["attributes"]["metadata"]["name"] -%}
+  {%- set fshName = fairsharingItem["attributes"]["metadata"]["abbreviation"] ~ " | " ~ 
+                    fairsharingItem["attributes"]["metadata"]["name"] -%}
+{%- else -%}  
+  {%- set fshName = fairsharingItem["attributes"]["metadata"]["name"] -%}
+{%- endif -%}
 {%- set fshDescription = fairsharingItem["attributes"]["metadata"]["description"] -%}
 {%- set fshHomepage = fairsharingItem["attributes"]["metadata"]["homepage"] -%}
 @prefix : <http://purl.org/nanopub/temp/fair-resource/{{ dc.qtn.uuid }}/{{ dc.doc.uuid }}#> .
