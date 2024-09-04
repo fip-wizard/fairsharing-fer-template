@@ -19,7 +19,7 @@
 {%- endmacro -%}
 {%- set dc = ctx|to_context_obj -%}
 {%- set km = ctx.knowledgeModel -%}
-{%- set repliesMap = ctx.questionnaireReplies -%}
+{%- set repliesMap = ctx.questionnaire.replies -%}
 {%- set fairsharingItem = {} -%}
 {%- set orcid = repliesMap[uuids.orcidPath]|reply_str_value -%}
 {%- if not orcid -%}
