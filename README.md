@@ -4,6 +4,10 @@ Creating nanopublication from FAIRsharing
 
 ## Changelog
 
+### 1.5.0
+
+- Update to metamodel v15
+
 ### 1.4.0
 
 - Update to metamodel v14
