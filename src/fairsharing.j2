@@ -9,7 +9,7 @@
 {%- set fairsharingReply = repliesMap[fairsharingPath] -%}
 {%- if not fairsharingReply -%}
     {{ ""|error("FAIRsharing resource not selected") }}
-{%- elif fairsharingReply.value.value.type != "IntegrationType"  -%}
+{%- elif fairsharingReply.value.value.type != "IntegrationLegacyType"  -%}
     {{ ""|error("FAIRsharing resource not selected from integration") }}
 {%- else -%}
     {%- set username = secrets["FAIRSHARING_USER"] -%}

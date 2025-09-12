@@ -4,11 +4,15 @@ Creating nanopublication from FAIRsharing
 
 ## Changelog
 
+### 2.4.0
+
+- Update to metamodel v17.0
+
 ### 2.3.4
 
 - Revert newline changes in 2.3.3
 
-### 2.3.3
+### 2.3.3
 
 - Replace newlines with spaces in FAIRsharing description
 
