@@ -4,6 +4,18 @@ Creating nanopublication from FAIRsharing
 
 ## Changelog
 
+### 2.3.4
+
+- Revert newline changes in 2.3.3
+
+### 2.3.3
+
+- Replace newlines with spaces in FAIRsharing description
+
+### 2.0.0
+
+- Rework for nanopub KM annotation
+
 ### 1.5.0
 
 - Update to metamodel v15

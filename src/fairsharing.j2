@@ -1,0 +1,51 @@
+{%- set repliesMap = ctx.questionnaire.replies -%}
+
+{%- set definitionCUuid = "a5310d62-c613-4d4d-a527-be6f6536bbdf" -%}
+{%- set fairsharingQUuid = "2dbfaeaa-ecd5-44c4-8d91-d71e50c1e1e7" -%}
+{%- set fairsharingPath = [definitionCUuid, fairsharingQUuid]|reply_path -%}
+
+{%- set fairsharingItem = {} -%}
+
+{%- set fairsharingReply = repliesMap[fairsharingPath] -%}
+{%- if not fairsharingReply -%}
+    {{ ""|error("FAIRsharing resource not selected") }}
+{%- elif fairsharingReply.value.value.type != "IntegrationType"  -%}
+    {{ ""|error("FAIRsharing resource not selected from integration") }}
+{%- else -%}
+    {%- set username = secrets["FAIRSHARING_USER"] -%}
+    {%- set password = secrets["FAIRSHARING_PASS"] -%}
+    {%- set headers = {"Accept": "application/json", "Content-Type": "application/json"} -%}
+    {%- set creds = {"user": {"login": username, "password": password}} -%}
+    {%- set r1 = requests.post("https://api.fairsharing.org/users/sign_in", headers=headers, json=creds) -%}
+    {%- set token = "" -%}
+    {%- if r1.ok -%}
+        {%- set token = r1.json()['jwt'] -%}
+    {%- else -%}
+        {{ ""|error("Failed to authenticate to FAIRsharing API") }}
+    {%- endif -%}
+    {%- set recordUrl = "https://api.fairsharing.org/fairsharing_records/" ~ fairsharingReply.value.value.id -%}
+    {%- set headers = {"Accept": "application/json", "Content-Type": "application/json", "Authorization": "Bearer " ~ token} -%}
+    {%- set r2 = requests.get(recordUrl, headers=headers) -%}
+    {%- if r2.ok -%}
+        {%- set fairsharingItem = r2.json()['data'] -%}
+    {%- else -%}
+        {{ ""|error("Failed process FAIRsharing API response") }}
+    {%- endif -%}
+{%- endif -%}
+
+{%- if not fairsharingItem.get("attributes", None) -%}
+    {{ "Failed process FAIRsharing API response"|error }}
+{%- endif -%}
+
+{%- set fshUrl = fairsharingItem["attributes"]["url"] -%}
+{%- if fairsharingItem["attributes"]["doi"] %}
+  {%- set fshUrl = "https://doi.org/" ~ fairsharingItem["attributes"]["doi"] -%}
+{%- endif -%}
+
+{%- set fshVars = {
+    "fshUrl": fshUrl,
+    "fshName": fairsharingItem["attributes"]["metadata"]["name"],
+    "fshAbbreviation": fairsharingItem["attributes"]["metadata"]["abbreviation"],
+    "fshDescription": fairsharingItem["attributes"]["metadata"]["description"],
+    "fshHomepage": fairsharingItem["attributes"]["metadata"]["homepage"],
+} -%}

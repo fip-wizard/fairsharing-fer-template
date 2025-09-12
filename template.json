@@ -1,17 +1,23 @@
 {
     "templateId": "fairsharing-fer-nanopublication",
     "organizationId": "gofair",
-    "version": "1.5.0",
+    "version": "2.3.4",
     "name": "FAIRsharing FER Nanopublication",
     "description": "Creating nanopublication from FAIRsharing",
     "license": "Apache-2.0",
-    "metamodelVersion": 15,
+    "metamodelVersion": 16,
     "allowedPackages": [
         {
-            "orgId": "gofair",
-            "kmId": "fair-enabling-resource-from-fairsharing",
-            "minVersion": null,
-            "maxVersion": null
+        "orgId": "gofair",
+        "kmId": "fair-enabling-resource-from-fairsharing",
+        "minVersion": "0.2.0",
+        "maxVersion": null
+        },
+        {
+        "orgId": "gofair",
+        "kmId": "FERfFS",
+        "minVersion": null,
+        "maxVersion": null
         }
     ],
     "formats": [
@@ -49,10 +55,12 @@
         }
     ],
     "_tdk": {
-        "version": "3.20.0",
+        "version": "4.22.4",
         "readmeFile": "README.md",
         "files": [
-            "src/*"
+        "*",
+        "!.git/",
+        "!.env"
         ]
     }
 }

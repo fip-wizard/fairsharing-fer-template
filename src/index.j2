@@ -1,0 +1,74 @@
+{%- import "src/submissions.j2" as submissions with context -%}
+{#- Global variables -#}
+{%- set dc = ctx|to_context_obj -%}
+{%- set vars_defaults = {
+  'config': {
+    'client_url': dc.config.client_url,
+  },
+  'qtn': {
+    'uuid': dc.qtn.uuid,
+    'name': dc.qtn.name,
+    'description': dc.qtn.description,
+    'tags': dc.qtn.project_tags,
+  },
+  'doc': {
+    'uuid': dc.doc.uuid,
+    'created_at': dc.doc.created_at|datetime_format("%Y-%m-%dT%H:%M:%SZ"),
+  },
+  'entity': dc.km,
+  'submissions': {
+    'nanopubs': submissions.nanopubs,
+  },
+} -%}
+{%- set vars = vars_defaults.copy() -%}
+{%- set nanopub_uris = [] -%}
+{%- set nanopub_index = dc.km.a.get('nanopub.index', '').lower() == 'true' -%}
+{#- FAIRsharing -#}
+{%- import "src/fairsharing.j2" as fairsharing with context -%}
+{%- do vars.update(fairsharing.fshVars) -%}
+{#- Imports -#}
+{%- import "src/nanopubs.j2" as nanopubs with context -%}
+{%- import "src/traverse.j2" as traverse with context -%}
+{#- Iterate for nanopubs -#}
+{{- traverse.traverseKm(dc.km) -}}
+{#- Nanopublication Index -#}
+{%- set index_uri = dc.config.client_url ~ "/" ~ dc.qtn.uuid ~ "/" ~ dc.doc.uuid ~ "/index" %}
+{%- if nanopub_index -%}
+  {%- set index_vars = {
+    'nanopub.index.before': '',
+    'nanopub.index.uri': index_uri,
+    'nanopub.index.prefixes': '',
+    'nanopub.index.statements': '',
+    'nanopub.index.provenance': '',
+    'nanopub.index.pubinfo': '',
+    'nanopub.index.after': '',
+  } %}
+  {%- for key in index_vars.keys() -%}
+    {%- set value = dc.km.a.get(key, '')|jinja2(variables=vars, fail_safe=True)|trim -%}
+    {%- if value -%}
+      {%- do index_vars.update({key: value}) -%}
+    {%- endif -%}
+  {%- endfor %}
+{{ nanopubs.indexNanopub(nanopub_uris, variables=index_vars) }}
+{%- endif -%}
+{#- Nanopublication Extra -#}
+{%- set nanopub_extra = dc.km.a.get('nanopub.index', '').lower() == 'true' -%}
+{%- set extra_uri = dc.config.client_url ~ "/" ~ dc.qtn.uuid ~ "/" ~ dc.doc.uuid %}
+{%- if nanopub_extra -%}
+  {%- set extra_vars = {
+    'nanopub.extra.before': '',
+    'nanopub.extra.uri': extra_uri,
+    'nanopub.extra.prefixes': '',
+    'nanopub.extra.statements': '',
+    'nanopub.extra.provenance': '',
+    'nanopub.extra.pubinfo': '',
+    'nanopub.extra.after': '',
+  } %}
+  {%- for key in extra_vars.keys() -%}
+    {%- set value = dc.km.a.get(key, '')|jinja2(variables=vars, fail_safe=True)|trim -%}
+    {%- if value -%}
+      {%- do extra_vars.update({key: value}) -%}
+    {%- endif -%}
+  {%- endfor %}
+{{ nanopubs.extraNanopub(variables=extra_vars) }}
+{%- endif -%}

@@ -1,0 +1,603 @@
+{%- set kmDefaults = [
+  'nanopub.default.prefixes',
+  'nanopub.default.uri',
+  'nanopub.default.statements',
+  'nanopub.default.pubinfo',
+  'nanopub.default.provenance',
+  'nanopub.default.before',
+  'nanopub.default.after',
+] -%}
+{%- set nanopubVars = [
+   'nanopub.prefixes',
+   'nanopub.statements.start',
+   'nanopub.statements.end',
+   'nanopub.pubinfo',
+   'nanopub.provenance',
+   'nanopub.before',
+   'nanopub.after',
+] -%}
+
+{%- set nanopub_defaults = {'nanopub.statements': []} -%}
+
+{%- macro setVarsFrom(entity, xvars) -%}
+  {%- for key in entity.a.keys() if key.startswith('nanopub.var.set.') and key|length > 16 -%}
+    {%- do xvars.update({key[16:]: entity.a[key]}) -%}
+  {%- endfor -%}
+  {%- for key in entity.a.keys() if key.startswith('nanopub.var.j2.') and key|length > 15 -%}
+    {%- do xvars.update({key[15:]: entity.a[key]|jinja2(variables=vars)}) -%}
+  {%- endfor -%}
+{%- endmacro -%}
+
+{%- macro initNanopubVars(entity, nanopub_vars) -%}
+  {%- for key in nanopubVars -%}
+    {%- do nanopub_vars.update({key: entity.a[key]}) -%}
+  {%- endfor -%}
+  {%- do nanopub_vars.update({'nanopub.statements': []}) -%}
+  {%- do nanopub_vars.update({'nanopub.uri': entity.a.get('nanopub.uri', '')|trim}) -%}
+{%- endmacro -%}
+
+{%- macro initItemNanopubVars(entity, nanopub_vars) -%}
+  {%- for key in nanopubVars -%}
+    {%- do nanopub_vars.update({key: entity.a[key]}) -%}
+  {%- endfor -%}
+  {%- do nanopub_vars.update({'nanopub.statements': []}) -%}
+  {%- do nanopub_vars.update({'nanopub.uri': entity.a.get('nanopub.item.uri', '')|trim}) -%}
+{%- endmacro -%}
+
+{%- macro renderNanopubVars(entity, nanopub_vars, xvars) -%}
+  {%- for key in nanopubVars -%}
+    {%- if key in entity.a.keys() -%}
+      {%- set value = entity.a[key]|jinja2(variables=xvars) -%}
+      {%- do nanopub_vars.update({key: value}) -%}
+    {%- else -%}
+      {%- do nanopub_vars.update({key: ''}) -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- for key in kmDefaults -%}
+    {%- set value = dc.km.a.get(key, '')|jinja2(variables=vars, fail_safe=True)|trim -%}
+    {%- if value -%}
+      {%- do nanopub_vars.update({key: value}) -%}
+    {%- endif -%}
+  {%- endfor %}
+  {%- set statements = nanopub_vars['nanopub.statements']|join('\n') -%}
+  {%- do nanopub_vars.update({'nanopub.statements': statements}) -%}
+  {%- set uri = nanopub_vars['nanopub.uri']|jinja2(variables=xvars) -%}
+  {%- if uri == '' -%}
+    {%- set uri = nanopub_vars['nanopub.default.uri']|jinja2(variables=xvars) -%}
+  {%- endif -%}
+  {%- do nanopub_vars.update({'nanopub.uri': uri}) -%}
+{%- endmacro -%}
+
+{%- macro updateStatements(entity, nanopub_vars, xvars) -%}
+  {%- if 'nanopub.statements.add' in entity.a.keys() -%}
+    {%- set statements = entity.a['nanopub.statements.add']|jinja2(variables=xvars) -%}
+    {%- do nanopub_vars['nanopub.statements'].append(statements) -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro validateOrcid(question, value) -%}
+  {%- if value|length == 19 -%}
+    {%- set parts = value.split('-') -%}
+    {%- if parts|length == 4 -%}
+      {%- for part in parts -%}
+        {%- if part|length != 4 -%}
+          {{- question.a['nanopub.validate.orcid']|error('Invalid ORCID') -}}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- else -%}
+      {{- question.a['nanopub.validate.orcid']|error('Invalid ORCID') -}}
+    {%- endif -%}
+  {%- else -%}
+    {{- question.a['nanopub.validate.orcid']|error('Invalid ORCID') -}}
+  {%- endif -%}
+{%- endmacro -%}
+{%- macro validateIntegrationReply(question, reply) -%}
+  {%- if 'nanopub.validate.required' in question.a.keys() -%}
+    {%- if reply.is_plain -%}
+      {{- question.a['nanopub.validate.integration']|error('Invalid value') -}}
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro -%}
+{%- macro validateQuestion(question, path) -%}
+  {%- set reply = question.replies.get(path) -%}
+  {%- if 'nanopub.validate.required' in question.a.keys() -%}
+    {%- if reply is none -%}
+      {{- question.a['nanopub.validate.required']|error('Missing reply') -}}
+    {%- endif -%}
+  {%- endif -%}
+  {%- if 'nanopub.validate.orcid' in question.a.keys() -%}
+    {%- if reply is none -%}
+      {{- question.a['nanopub.validate.orcid']|error('Invalid ORCID (empty)') -}}
+    {%- endif -%}
+    {{- validateOrcid(question, reply.value) -}}
+  {%- endif -%}
+  {%- if 'nanopub.validate.integration' in question.a.keys() -%}
+    {%- if reply is none -%}
+      {{- question.a['nanopub.validate.integration']|error('Invalid value (empty)') -}}
+    {%- endif -%}
+    {{- validateIntegrationReply(question, reply) -}}
+  {%- endif -%}
+{%- endmacro -%}
+
+{#- KM -#}
+{%- macro traverseKm(km) -%}
+  {%- do vars.update({'entity': km}) -%}
+  {%- set creates_nanopub = 'nanopub.uri' in km.a.keys() -%}
+  {#- variables -#}
+  {{- setVarsFrom(km, vars) -}}
+  {#- nanopub defaults -#}
+  {%- for key in kmDefaults -%}
+    {%- set value = km.a.get(key, '')|jinja2(vars=vars, fail_safe=True) -%}
+    {%- do nanopub_defaults.update({key: value}) -%}
+  {%- endfor -%}
+  {#- check nanopub -#}
+  {%- if creates_nanopub -%}
+    {%- set nanopub_vars = {} -%}
+    {{- initNanopubVars(km, nanopub_vars) -}}
+    {#- traverse chapters (in) -#}
+    {%- for chapter in km.chapters -%}
+      {{- traverseInChapter(chapter, nanopub_vars) -}}
+    {%- endfor -%}
+    {%- do vars.update({'entity': km}) -%}
+    {#- print nanopub -#}
+{{- renderNanopubVars(km, nanopub_vars, vars) -}}
+{{ nanopubs.basicNanopub(nanopub_vars) }}
+  {% else -%}
+    {#- traverse chapters (out) -#}
+    {%- for chapter in km.chapters -%}
+      {{- traverseOutChapter(chapter) -}}
+    {%- endfor -%}
+    {%- do vars.update({'entity': km}) -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{#- CHAPTER -#}
+{%- macro traverseOutChapter(chapter) -%}
+  {%- set path = chapter.uuid -%}
+  {%- do vars.update({'entity': chapter}) -%}
+  {%- set creates_nanopub = 'nanopub.uri' in chapter.a.keys() -%}
+  {#- variables -#}
+  {{- setVarsFrom(chapter, vars) -}}
+  {#- check nanopub -#}
+  {%- if creates_nanopub -%}
+    {%- set nanopub_vars = nanopub_defaults.copy() -%}
+    {{- initNanopubVars(chapter, nanopub_vars) -}}
+    {#- traverse chapters (in) -#}
+    {%- for question in chapter.questions -%}
+      {{- traverseInQuestion(question, path, vars, nanopub_vars) -}}
+    {%- endfor -%}
+    {%- do vars.update({'entity': chapter}) -%}
+    {#- print nanopub -#}
+{{- renderNanopubVars(chapter, nanopub_vars, vars) -}}
+{{ nanopubs.basicNanopub(nanopub_vars) }}
+  {% else -%}
+    {#- traverse chapters (out) -#}
+    {%- for question in chapter.questions -%}
+      {{- traverseOutQuestion(question, path, vars) -}}
+    {%- endfor -%}
+    {%- do vars.update({'entity': chapter}) -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro traverseInChapter(chapter, nanopub_vars) -%}
+  {%- set path = chapter.uuid -%}
+  {%- do vars.update({'entity': chapter}) -%}
+  {#- variables -#}
+  {{- setVarsFrom(chapter, vars) -}}
+  {#- traverse questions (in/out) -#}
+  {%- for question in chapter.questions -%}
+    {{- traverseInQuestion(question, path, vars, nanopub_vars) -}}
+  {%- endfor -%}
+  {{- updateStatements(chapter, nanopub_vars, vars) -}}
+{%- endmacro -%}
+
+{#- QUESTIONS -#}
+{%- macro traverseOutQuestion(question, path_prefix, reply_vars) -%}
+  {%- set path = path_prefix ~ '.' ~ question.uuid -%}
+  {%- do vars.update({'entity': question}) -%}
+  {#- validate -#}
+  {{- validateQuestion(question, path) -}}
+  {#- variables -#}
+  {{- setVarsFrom(question, reply_vars) -}}
+  {#- split -#}
+  {%- if question is of_type("ValueQuestion") -%}
+    {{ traverseOutValueQuestion(question, path, reply_vars) }}
+  {%- elif question is of_type("OptionsQuestion") -%}
+    {{ traverseOutOptionsQuestion(question, path, reply_vars) }}
+  {%- elif question is of_type("ListQuestion") -%}
+    {{ traverseOutListQuestion(question, path, reply_vars) }}
+  {%- elif question is of_type("IntegrationQuestion") -%}
+    {{ traverseOutIntegrationQuestion(question, path, reply_vars) }}
+  {%- elif question is of_type("MultiChoiceQuestion") -%}
+    {{ traverseOutMultiChoiceQuestion(question, path, reply_vars) }}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro traverseOutValueQuestion(question, path, reply_vars) -%}
+  {%- set creates_nanopub = 'nanopub.uri' in question.a.keys() -%}
+  {#- set reply var -#}
+  {%- set reply_varname = question.a.get('nanopub.var.reply', '') -%}
+  {%- if reply_varname != '' and path in question.replies.keys() -%}
+    {%- set reply = question.replies.get(path) -%}
+    {%- do reply_vars.update({reply_varname: reply.value}) -%}
+  {%- endif -%}
+  {#- check nanopub -#}
+  {%- if creates_nanopub -%}
+    {%- set nanopub_vars = nanopub_defaults.copy() -%}
+    {{- initNanopubVars(question, nanopub_vars) -}}
+    {#- print nanopub -#}
+{{- renderNanopubVars(question, nanopub_vars, vars) -}}
+{{ nanopubs.basicNanopub(nanopub_vars) }}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro traverseOutIntegrationQuestion(question, path, reply_vars) -%}
+  {%- set creates_nanopub = 'nanopub.uri' in question.a.keys() -%}
+  {#- set reply var -#}
+  {%- set reply_varname = question.a.get('nanopub.var.reply', '') -%}
+  {%- if reply_varname != '' and path in question.replies.keys() -%}
+    {%- set reply = question.replies.get(path) -%}
+    {%- do reply_vars.update({reply_varname: {
+      'value': reply.value,
+      'id': reply.id,
+      'url': reply.url,
+    }}) -%}
+  {%- endif -%}
+  {#- check nanopub -#}
+  {%- if creates_nanopub -%}
+    {%- set nanopub_vars = nanopub_defaults.copy() -%}
+    {{- initNanopubVars(question, nanopub_vars) -}}
+    {#- print nanopub -#}
+{{- renderNanopubVars(question, nanopub_vars, vars) -}}
+{{ nanopubs.basicNanopub(nanopub_vars) }}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro traverseOutMultiChoiceQuestion(question, path, reply_vars) -%}
+  {%- set creates_nanopub = 'nanopub.uri' in question.a.keys() -%}
+  {#- set reply var -#}
+  {%- set reply_varname = question.a.get('nanopub.var.reply', '') -%}
+  {%- set reply = question.replies.get(path) -%}
+  {%- if reply_varname != '' and reply -%}
+    {%- do reply_vars.update({reply_varname: []}) -%}
+    {%- for choice in reply.choices -%}
+      {%- do reply_vars[reply_varname].append({
+        'id': choice.uuid,
+        'value': choice.label,
+      }) -%}
+    {%- endfor -%}
+  {%- endif -%}
+  {#- check nanopub -#}
+  {%- if creates_nanopub -%}
+    {%- set nanopub_vars = nanopub_defaults.copy() -%}
+    {{- initNanopubVars(question, nanopub_vars) -}}
+    {#- traverse choices (in) -#}
+    {%- if reply -%}
+      {%- for choice in reply.choices -%}
+        {{- traverseInChoice(choice, reply_vars, nanopub_vars) -}}
+      {%- endfor -%}
+      {%- do vars.update({'entity': question}) -%}
+    {%- endif -%}
+    {#- print nanopub -#}
+{{- renderNanopubVars(question, nanopub_vars, vars) -}}
+{{ nanopubs.basicNanopub(nanopub_vars) }}
+  {% else -%}
+    {#- traverse choices (out) -#}
+    {%- if reply -%}
+      {%- for choice in reply.choices -%}
+        {{- traverseOutChoice(choice, reply_vars) -}}
+      {%- endfor -%}
+      {%- do vars.update({'entity': question}) -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro traverseOutOptionsQuestion(question, path, reply_vars) -%}
+  {%- set creates_nanopub = 'nanopub.uri' in question.a.keys() -%}
+  {%- set reply = question.replies.get(path) -%}
+  {#- set reply var -#}
+  {%- set reply_varname = question.a.get('nanopub.var.reply', '') -%}
+  {%- if reply_varname != '' and reply -%}
+    {%- do reply_vars.update({reply_varname: {
+      'id': reply.answer.uuid,
+      'value': reply.answer.label,
+    }}) -%}
+  {%- endif -%}
+  {#- check nanopub -#}
+  {%- if creates_nanopub -%}
+    {%- set nanopub_vars = nanopub_defaults.copy() -%}
+    {{- initNanopubVars(question, nanopub_vars) -}}
+    {#- traverse answer (in) -#}
+    {%- if reply -%}
+      {{- traverseInAnswer(reply.answer, path, reply_vars, nanopub_vars) -}}
+      {%- do vars.update({'entity': question}) -%}
+    {%- endif -%}
+    {#- print nanopub -#}
+{{- renderNanopubVars(question, nanopub_vars, vars) -}}
+{{ nanopubs.basicNanopub(nanopub_vars) }}
+  {% else -%}
+    {#- traverse answer (out) -#}
+    {%- if reply -%}
+      {{- traverseOutAnswer(reply.answer, path, reply_vars) -}}
+      {%- do vars.update({'entity': question}) -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro traverseOutListQuestion(question, path, reply_vars) -%}
+  {%- set creates_nanopub = 'nanopub.uri' in question.a.keys() -%}
+  {%- set creates_item_nanopubs = 'nanopub.item.uri' in question.a.keys() -%}
+  {%- set reply = question.replies.get(path) -%}
+  {#- set reply var -#}
+  {%- set follow_reply_vars = None -%}
+  {%- set reply_varname = question.a.get('nanopub.var.reply', '') -%}
+  {%- set nanopub_vars = nanopub_defaults.copy() -%}
+  {%- if reply_varname != '' and reply -%}
+    {%- set follow_reply_vars = {} -%}
+    {%- do reply_vars.update({reply_varname: follow_reply_vars}) -%}
+    {%- for item_id in reply.items -%}
+      {%- do follow_reply_vars.update({item_id: {}}) -%}
+    {%- endfor -%}
+    {#- traverse (nested vars) -#}
+    {%- for item_id in reply.items -%}
+      {%- set item_path = path ~ '.' ~ item_id -%}
+      {%- for followup in question.followups -%}
+        {{- traverseInQuestion(followup, item_path, follow_reply_vars[item_id], nanopub_vars) -}}
+      {%- endfor -%}
+    {%- endfor -%}
+    {%- do vars.update({'entity': question}) -%}
+  {%- elif reply -%}
+    {#- traverse (normal) -#}
+    {%- for item_id in reply.items -%}
+      {%- set item_path = path ~ '.' ~ item_id -%}
+      {%- for followup in question.followups -%}
+        {{- traverseInQuestion(followup, item_path, reply_vars, nanopub_vars) -}}
+      {%- endfor -%}
+    {%- endfor -%}
+    {%- do vars.__setitem__('entity', question) -%}
+  {%- endif -%}
+
+  {#- check nanopub -#}
+  {%- if creates_nanopub -%}
+    {%- set nanopub_vars = nanopub_defaults.copy() -%}
+    {{- initNanopubVars(question, nanopub_vars) -}}
+    {#- traverse followups (in) -#}
+    {%- if reply and follow_reply_vars is none -%}
+      {%- for item_id in reply.items -%}
+        {%- set item_path = path ~ '.' ~ item_id -%}
+        {%- for followup in question.followups -%}
+          {{- traverseInQuestion(followup, item_path, reply_vars, nanopub_vars) -}}
+        {%- endfor -%}
+      {%- endfor -%}
+      {%- do vars.__setitem__('entity', question) -%}
+    {%- elif reply -%}
+      {%- for item_id in reply.items -%}
+        {%- set item_path = path ~ '.' ~ item_id -%}
+        {%- for followup in question.followups -%}
+          {{- traverseInQuestion(followup, item_path, follow_reply_vars[item_id], nanopub_vars) -}}
+        {%- endfor -%}
+      {%- endfor -%}
+      {%- do vars.__setitem__('entity', question) -%}
+    {%- endif -%}
+    {#- print nanopub -#}
+{{- renderNanopubVars(question, nanopub_vars, vars) -}}
+{{ nanopubs.basicNanopub(nanopub_vars) }}
+  {% elif creates_item_nanopubs %}
+    {%- if reply and follow_reply_vars is none -%}
+      {%- for item_id in reply.items -%}
+        {%- set nanopub_vars = nanopub_defaults.copy() -%}
+        {{- initItemNanopubVars(question, nanopub_vars) -}}
+        {%- set item_path = path ~ '.' ~ item_id -%}
+        {%- for followup in question.followups -%}
+          {{- traverseInQuestion(followup, item_path, reply_vars, nanopub_vars) -}}
+        {%- endfor -%}
+        {%- set item_np_vars = vars.copy() %}
+        {%- do item_np_vars.update(reply_vars) %}
+        {%- do item_np_vars.__setitem__('item_id', item_id) %}
+{{- renderNanopubVars(question, nanopub_vars, item_np_vars) -}}
+{{ nanopubs.basicNanopub(nanopub_vars) }}
+      {%- endfor -%}
+      {%- do vars.__setitem__('entity', question) -%}
+    {%- elif reply -%}
+      {%- for item_id in reply.items -%}
+        {%- set nanopub_vars = nanopub_defaults.copy() -%}
+        {{- initItemNanopubVars(question, nanopub_vars) -}}
+        {%- set item_path = path ~ '.' ~ item_id -%}
+        {%- for followup in question.followups -%}
+          {{- traverseInQuestion(followup, item_path, follow_reply_vars[item_id], nanopub_vars) -}}
+        {%- endfor -%}
+        {%- set item_np_vars = vars.copy() %}
+        {%- do item_np_vars.update(follow_reply_vars[item_id]) %}
+        {%- do item_np_vars.__setitem__('item_id', item_id) %}
+{{- renderNanopubVars(question, nanopub_vars, item_np_vars) -}}
+{{ nanopubs.basicNanopub(nanopub_vars) }}
+      {%- endfor -%}
+      {%- do vars.__setitem__('entity', question) -%}
+    {%- endif -%}
+  {% else -%}
+    {#- traverse followups (out) -#}
+    {%- if reply and follow_reply_vars is none -%}
+      {%- for item_id in reply.items -%}
+        {%- set item_path = path ~ '.' ~ item_id -%}
+        {{- traverseOutQuestion(followup, item_path, reply_vars) -}}
+      {%- endfor -%}
+      {%- do vars.__setitem__('entity', question) -%}
+    {%- elif reply -%}
+      {%- set item_path = path ~ '.' ~ item_id -%}
+      {%- for followup in question.followups -%}
+        {{- traverseOutQuestion(followup, item_path, follow_reply_vars[item_id]) -}}
+      {%- endfor -%}
+      {%- do vars.__setitem__('entity', question) -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro traverseInQuestion(question, path_prefix, reply_vars, nanopub_vars) -%}
+  {%- do vars.__setitem__('entity', question) -%}
+  {%- set path = path_prefix ~ '.' ~ question.uuid -%}
+  {#- validate -#}
+  {{- validateQuestion(question, path) -}}
+  {#- variables -#}
+  {{- setVarsFrom(question, reply_vars) -}}
+  {#- split -#}
+  {%- if question is of_type("ValueQuestion") -%}
+    {{ traverseInValueQuestion(question, path, reply_vars, nanopub_vars) }}
+  {%- elif question is of_type("OptionsQuestion") -%}
+    {{ traverseInOptionsQuestion(question, path, reply_vars, nanopub_vars) }}
+  {%- elif question is of_type("ListQuestion") -%}
+    {{ traverseInListQuestion(question, path, reply_vars, nanopub_vars) }}
+  {%- elif question is of_type("IntegrationQuestion") -%}
+    {{ traverseInIntegrationQuestion(question, path, reply_vars, nanopub_vars) }}
+  {%- elif question is of_type("MultiChoiceQuestion") -%}
+    {{ traverseInMultiChoiceQuestion(question, path, reply_vars, nanopub_vars) }}
+  {%- endif -%}
+  {{- updateStatements(question, nanopub_vars, reply_vars) -}}
+{%- endmacro -%}
+
+{%- macro traverseInValueQuestion(question, path, reply_vars, nanopub_vars) -%}
+  {#- set reply var -#}
+  {%- set reply_varname = question.a.get('nanopub.var.reply', '') -%}
+  {%- if reply_varname != '' and path in question.replies.keys() -%}
+    {%- set reply = question.replies.get(path) -%}
+    {%- do reply_vars.__setitem__(reply_varname, reply.value) -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro traverseInIntegrationQuestion(question, path, reply_vars, nanopub_vars) -%}
+  {#- set reply var -#}
+  {%- set reply_varname = question.a.get('nanopub.var.reply', '') -%}
+  {%- if reply_varname != '' and path in question.replies.keys() -%}
+    {%- set reply = question.replies.get(path) -%}
+    {%- do reply_vars.__setitem__(reply_varname, {
+      'value': reply.value,
+      'id': reply.id,
+      'url': reply.url,
+    }) -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro traverseInMultiChoiceQuestion(question, path, reply_vars, nanopub_vars) -%}
+  {%- set reply = question.replies.get(path) -%}
+  {#- set reply var -#}
+  {%- set reply_varname = question.a.get('nanopub.var.reply', '') -%}
+  {%- if reply_varname != '' and reply -%}
+    {%- do reply_vars.__setitem__(reply_varname, []) -%}
+    {%- for choice in reply.choices -%}
+      {%- do reply_vars[reply_varname].append({
+        'id': choice.uuid,
+        'value': choice.label,
+      }) -%}
+    {%- endfor -%}
+  {%- endif -%}
+  {#- traverse -#}
+  {%- if reply -%}
+    {%- for choice in reply.choices -%}
+      {{- traverseInChoice(choice, reply_vars, nanopub_vars) -}}
+    {%- endfor -%}
+    {%- do vars.__setitem__('entity', question) -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro traverseInOptionsQuestion(question, path, reply_vars, nanopub_vars) -%}
+  {%- set reply = question.replies.get(path) -%}
+  {#- set reply var -#}
+  {%- set reply_varname = question.a.get('nanopub.var.reply', '') -%}
+  {%- if reply_varname != '' and reply -%}
+    {%- do reply_vars.__setitem__(reply_varname, {
+      'id': reply.answer.uuid,
+      'value': reply.answer.label,
+    }) -%}
+  {%- endif -%}
+  {#- traverse -#}
+  {%- if reply -%}
+    {{- traverseInAnswer(reply.answer, path, reply_vars, nanopub_vars) -}}
+    {%- do vars.__setitem__('entity', question) -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro traverseInListQuestion(question, path, reply_vars, nanopub_vars) -%}
+  {%- set reply = question.replies.get(path) -%}
+  {#- set reply var -#}
+  {%- set reply_varname = question.a.get('nanopub.var.reply', '') -%}
+  {%- if reply_varname != '' and reply -%}
+    {%- set follow_reply_vars = {} -%}
+    {%- do reply_vars.__setitem__(reply_varname, follow_reply_vars) -%}
+    {%- for item_id in reply.items -%}
+      {%- do follow_reply_vars.__setitem__(item_id, {}) -%}
+    {%- endfor -%}
+    {#- traverse (nested vars) -#}
+    {%- for item_id in reply.items -%}
+      {%- set item_path = path ~ '.' ~ item_id -%}
+      {%- for followup in question.followups -%}
+        {{- traverseInQuestion(followup, item_path, follow_reply_vars[item_id], nanopub_vars) -}}
+      {%- endfor -%}
+    {%- endfor -%}
+    {%- do vars.__setitem__('entity', question) -%}
+  {%- elif reply -%}
+    {#- traverse (normal) -#}
+    {%- if reply -%}
+      {%- for item_id in reply.items -%}
+        {%- set item_path = path ~ '.' ~ item_id -%}
+        {%- for followup in question.followups -%}
+          {{- traverseInQuestion(followup, item_path, reply_vars, nanopub_vars) -}}
+        {%- endfor -%}
+      {%- endfor -%}
+      {%- do vars.__setitem__('entity', question) -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{#- ANSWER -#}
+{%- macro traverseOutAnswer(answer, path_prefix, reply_vars) -%}
+  {%- do vars.__setitem__('entity', answer) -%}
+  {%- set path = path_prefix ~ '.' ~ answer.uuid -%}
+  {%- set creates_nanopub = 'nanopub.uri' in answer.a.keys() -%}
+  {#- variables -#}
+  {{- setVarsFrom(answer, reply_vars) -}}
+  {#- check nanopub -#}
+  {%- if creates_nanopub -%}
+    {%- set nanopub_vars = nanopub_defaults.copy() -%}
+    {{- initNanopubVars(answer, nanopub_vars) -}}
+    {#- traverse followups (in) -#}
+    {%- for followup in answer.followups -%}
+      {{- traverseInQuestion(followup, path, reply_vars, nanopub_vars) -}}
+    {%- endfor -%}
+    {%- do vars.__setitem__('entity', answer) -%}
+    {#- print nanopub -#}
+{{- renderNanopubVars(answer, nanopub_vars, vars) -}}
+{{ nanopubs.basicNanopub(nanopub_vars) }}
+  {% else -%}
+    {#- traverse followups (out) -#}
+    {%- for followup in answer.followups -%}
+      {{- traverseOutQuestion(followup, path, reply_vars) -}}
+    {%- endfor -%}
+    {%- do vars.__setitem__('entity', answer) -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro traverseInAnswer(answer, path_prefix, reply_vars, nanopub_vars) -%}
+  {%- do vars.__setitem__('entity', answer) -%}
+  {%- set path = path_prefix ~ '.' ~ answer.uuid -%}
+  {#- variables -#}
+  {{- setVarsFrom(answer, reply_vars) -}}
+  {#- traverse questions -#}
+  {%- for question in answer.followups -%}
+    {{- traverseInQuestion(question, path, reply_vars, nanopub_vars) -}}
+  {%- endfor -%}
+  {{- updateStatements(answer, nanopub_vars, vars) -}}
+  {%- do vars.__setitem__('entity', answer) -%}
+{%- endmacro -%}
+
+{#- CHOICE -#}
+{%- macro traverseOutChoice(choice, reply_vars) -%}
+  {%- do vars.__setitem__('entity', choice) -%}
+  {#- variables -#}
+  {{- setVarsFrom(choice, reply_vars) -}}
+{%- endmacro -%}
+
+{%- macro traverseInChoice(choice, reply_vars, nanopub_vars) -%}
+  {%- do vars.__setitem__('entity', choice) -%}
+  {#- variables -#}
+  {{- setVarsFrom(choice, reply_vars) -}}
+  {{- updateStatements(choice, nanopub_vars, vars) -}}
+{%- endmacro -%}
