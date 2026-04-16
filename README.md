@@ -4,6 +4,10 @@ Creating nanopublication from FAIRsharing
 
 ## Changelog
 
+### 2.6.0
+
+- Update to metamodel v18.0 (DSW v4.29.0)
+
 ### 2.5.0
 
 - Update with `safe` filter to avoid issues with security patch in v4.28.4
