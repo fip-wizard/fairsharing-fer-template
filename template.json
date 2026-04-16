@@ -1,11 +1,11 @@
 {
     "templateId": "fairsharing-fer-nanopublication",
     "organizationId": "gofair",
-    "version": "2.4.0",
+    "version": "2.5.0",
     "name": "FAIRsharing FER Nanopublication",
     "description": "Creating nanopublication from FAIRsharing",
     "license": "Apache-2.0",
-    "metamodelVersion": "17.0",
+    "metamodelVersion": "17.1",
     "allowedPackages": [
         {
             "orgId": "gofair",
@@ -55,11 +55,11 @@
         }
     ],
     "_tdk": {
-        "version": "4.22.4",
+        "version": "4.28.0",
         "readmeFile": "README.md",
         "files": [
             "src/*",
-            "LICENSE",
+            "./LICENSE",
             "!env/",
             "!.git/",
             "!.env"
