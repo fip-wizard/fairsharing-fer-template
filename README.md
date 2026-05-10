@@ -4,6 +4,10 @@ Creating nanopublication from FAIRsharing
 
 ## Changelog
 
+### 2.6.1
+
+- Fixed retrieving project replies
+
 ### 2.6.0
 
 - Update to metamodel v18.0 (DSW v4.29.0)
