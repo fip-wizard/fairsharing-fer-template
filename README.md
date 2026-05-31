@@ -4,6 +4,10 @@ Creating nanopublication from FAIRsharing
 
 ## Changelog
 
+### 2.7.0
+
+- Use `project` instead of `qtn` for consistency
+
 ### 2.6.1
 
 - Fixed retrieving project replies

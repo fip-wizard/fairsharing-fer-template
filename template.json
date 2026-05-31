@@ -1,7 +1,7 @@
 {
     "templateId": "fairsharing-fer-nanopublication",
     "organizationId": "gofair",
-    "version": "2.6.1",
+    "version": "2.7.0",
     "name": "FAIRsharing FER Nanopublication",
     "description": "Creating nanopublication from FAIRsharing",
     "license": "Apache-2.0",
@@ -9,14 +9,8 @@
     "allowedPackages": [
         {
             "orgId": "gofair",
-            "kmId": "fair-enabling-resource-from-fairsharing",
-            "minVersion": "0.2.0",
-            "maxVersion": null
-        },
-        {
-            "orgId": "gofair",
             "kmId": "FERfFS",
-            "minVersion": null,
+            "minVersion": "0.0.22",
             "maxVersion": null
         }
     ],
